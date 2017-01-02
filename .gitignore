@@ -4,3 +4,5 @@
 /.idea/libraries
 .DS_Store
 /build
+/helper_scripts/runjsonproxy.bat
+/helper_scripts/runsim.bat

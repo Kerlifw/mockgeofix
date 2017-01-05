@@ -22,38 +22,41 @@ except ImportError:
 ### bundled packages
 import gpxdata
 ###
+import Queue
+import uuid
 
 INDEX = "/whereami/whereami.html"
 UPDATE_INTERVAL = 0.3
 
-curr_lat = 48.7833  # updated by main thread, read by http and geofix threads
-curr_lon = 9.1833   # updated by main thread, read by http and geofix threads
+curr_lat = None  # updated by main thread, read by http and geofix threads
+curr_lon = None   # updated by main thread, read by http and geofix threads
 
+class QueueWithMark:
+    def __init__(self):
+        self.q = Queue.Queue()
+        self.uuid = uuid.uuid1()
+
+    def clear_and_put_all(self, items):
+        self.uuid = uuid.uuid1()
+        with self.q.mutex: #!!
+            self.q.queue.clear()
+        for item in items:
+            self.q.put(item)
+
+    def get(self):
+        return self.q.get()
+
+    def mark(self):
+        return self.uuid
+
+    def empty(self):
+        return self.q.empty()
 
 def main(args):
-    global curr_lon
-    global curr_lat
-
-    try:
-        track = gpxdata.Track.fromGPX(gpxdata.parse(args.gpx_file))
-    except Exception as ex:
-        print("Error loading a track from the GPX file: %s" % ex)
-        sys.exit(2)
-
-    def create_track_iter():
-        for segment in track:
-            for point in segment:
-                yield point
-    track_iter = create_track_iter()
-    try:
-        point = next(track_iter)
-    except StopIteration:
-        print("No points found in the track. Exiting.")
-    curr_lon = point.lon
-    curr_lat = point.lat
+    queue = QueueWithMark()
 
     if args.listen_ip:
-        http_thread = threading.Thread(target=start_http_server, args=(args,))
+        http_thread = threading.Thread(target=start_http_server, args=(args, queue,))
         http_thread.daemon = True
         http_thread.start()
         time.sleep(1)
@@ -68,12 +71,11 @@ def main(args):
 
     print("Location mocking started.")
     if not t_speed:
-        walk_track_interval(track_iter, float(args.sleep), point)
+        walk_track_interval(queue, float(args.sleep))
     else:
-        walk_track_speed(track_iter, t_speed, point)
+        walk_track_speed(queue, t_speed)
 
-
-def walk_track_interval(track, t_sleep, _):
+def walk_track_interval(track, t_sleep):
     global curr_lon
     global curr_lat
     while True:
@@ -86,36 +88,52 @@ def walk_track_interval(track, t_sleep, _):
         curr_lon = point.lon
         curr_lat = point.lat
 
-
-def walk_track_speed(track, speed, point):
+def walk_step(queue, mark_last, p1, p2, speed):
     global curr_lon
     global curr_lat
+
+    distance = p1.distance(p2)
+    travel_time = distance / speed  # in seconds
+
+    if travel_time <= UPDATE_INTERVAL:
+        time.sleep(travel_time)
+    while travel_time > UPDATE_INTERVAL:
+        time.sleep(UPDATE_INTERVAL)
+        if queue.mark() != mark_last:
+            return False
+        travel_time -= UPDATE_INTERVAL
+        # move GEOFIX_UPDATE_INTERVAL*speed meters
+        # in straight line between last_point and point
+        course = p1.course(p2)
+        distance = UPDATE_INTERVAL * speed
+        p1 = p1 + gpxdata.CourseDistance(course, distance)
+        curr_lat = p1.lat
+        curr_lon = p1.lon
+    return True
+
+def walk_track_speed(queue, speed):
+    global curr_lon
+    global curr_lat
+
     while True:
-        try:
-            next_point = next(track)
-        except StopIteration:
-            print("done")
-            sys.exit(0)
-        distance = point.distance(next_point)
-        travel_time = distance / speed  # in seconds
+        p1 = queue.get()
+        p2 = queue.get()
+        mark_last = queue.mark()
+        while True:
+            print("(%f, %f) -> (%f, %f)" % (p1.lat, p1.lon, p2.lat, p2.lon))
 
-        if travel_time <= UPDATE_INTERVAL:
-            time.sleep(travel_time)
-        while travel_time > UPDATE_INTERVAL:
-            time.sleep(UPDATE_INTERVAL)
-            travel_time -= UPDATE_INTERVAL
-            # move GEOFIX_UPDATE_INTERVAL*speed meters
-            # in straight line between last_point and point
-            course = point.course(next_point)
-            distance = UPDATE_INTERVAL * speed
-            point = point + gpxdata.CourseDistance(course, distance)
-            curr_lat = point.lat
-            curr_lon = point.lon
+            if not walk_step(queue, mark_last, p1, p2, speed):
+                print("reset")
+                break
 
-        point = next_point
-        curr_lat = point.lat
-        curr_lon = point.lon
-
+            p1 = p2
+            curr_lat = p1.lat
+            curr_lon = p1.lon
+            if queue.empty() or queue.mark() != mark_last:
+                print("next")
+                break
+            p2 = queue.get()
+            print("end")
 
 def start_geofix(args):
     s = socket.socket()
@@ -139,43 +157,96 @@ def start_geofix(args):
                     print("Connection closed.")
                     thread.interrupt_main()
             if s in wlist:
-                s.send("geo fix %f %f\r\n" % (curr_lon, curr_lat))
+                if curr_lon != None and curr_lat != None:
+                    msg = "geo fix %f %f\r\n" % (curr_lon, curr_lat)
+                    s.send(msg)
+                    #print(msg)
             time.sleep(UPDATE_INTERVAL)
     except socket.error as ex:
         print(ex)
         thread.interrupt_main()
 
 
-def start_http_server(args):
+def start_http_server(args, queue):
     import SimpleHTTPServer
     import SocketServer
     from StringIO import StringIO
 
-    class Handler(SimpleHTTPServer.SimpleHTTPRequestHandler):
+    import BaseHTTPServer
+    import mimetypes
+    from os import curdir, sep
+    import json 
+    from gpxdata import TrackPoint
+
+    mimetypes.init()
+
+    class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
         def do_GET(self):
             if self.path.strip() == "/":
                 self.send_response(301)
                 self.send_header("Location", INDEX)
                 self.end_headers()
-                return None
             elif self.path.strip() == "/getpos":
-                return self.get_position()
-            return SimpleHTTPServer.SimpleHTTPRequestHandler.do_GET(self)
+                self.get_position()
+            else:
+                path = self.path.strip();
+                filename, file_extension = os.path.splitext(path)
+                if "" == file_extension:
+                    self.send_error(404, 'File Not Found: %s' % self.path)
+                    return
+
+                local_path = curdir + sep + path;
+                if not os.path.exists(local_path):
+                    self.send_error(404, 'File Not Found: %s' % self.path)
+                    return
+
+                mimetype = mimetypes.types_map[file_extension]
+                self.send_response(200)
+                self.send_header('Content-type', mimetype)
+                self.end_headers()
+                with open(local_path, 'rb') as f:
+                    self.wfile.write(f.read())
+                    
+        def do_POST(self):
+            self.send_response(200)
+            self.send_header('Content-type','text/html')
+            self.end_headers()
+            self.wfile.write("ok")
+
+        def do_PUT(self):
+            length = int(self.headers.getheader('Content-Length'))
+            data = json.loads(self.rfile.read(length))
+            points = []
+            for latlng in data:
+                points.append(TrackPoint(latlng[u'lat'], latlng[u'lng']))
+            queue.clear_and_put_all(points)
+
+            self.send_response(200)
+            self.send_header('Content-type','text/html')
+            self.end_headers()
+            self.wfile.write("ok")
 
         def get_position(self):
+
             f = StringIO()
-            f.write("""{
-                "status": "OK",
-                "accuracy": 10.0,
-                "location": {"lat": %f, "lng": %f}
-            }""" % (curr_lat, curr_lon))
+            if curr_lat == None or curr_lon == None:
+                f.write("""{
+                    "status": "WAIT",
+                    "accuracy": 10.0
+                }""")
+            else:
+                f.write("""{
+                    "status": "OK",
+                    "accuracy": 10.0,
+                    "location": {"lat": %f, "lng": %f}
+                }""" % (curr_lat, curr_lon))
             self.send_response(200)
             self.send_header("Content-type", "application/json")
             length = f.tell()
             f.seek(0)
             self.send_header("Content-Length", str(length))
             self.end_headers()
-            self.copyfile(f, self.wfile)
+            self.wfile.write(f.read(length))
 
         def list_directory(self, _):
             self.path = "/"
@@ -208,7 +279,6 @@ if __name__ == '__main__':
     args_parser.add_argument("-i", "--ip", help="connect to MockGeoFix using this IP address",
                              required=True)
     args_parser.add_argument("-p", "--port", default=5554, help="default: 5554", type=int)
-    args_parser.add_argument("-g", "--gpx-file", required=True)
     args_parser.add_argument("-S", "--sleep", help="sleep between track points (default: 0.5)",
                              required=False, default=0.5, type=float)
     args_parser.add_argument("-s", "--speed", help="speed in km/h (takes precedence over -S)",

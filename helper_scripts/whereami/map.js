@@ -48,12 +48,7 @@ function init_map() {
     }).addTo(map);
 
     control.on('routesfound', function(e) {
-        console.log(e.routes);
         let route = e.routes[0];
-        //for (let v of route.coordinates) {
-            //L.marker([v.lat, v.lng]).addTo(map);
-        //}
-        //
         $.ajax({
             method: 'PUT',
             contentType: 'application/json; charset=utf-8',

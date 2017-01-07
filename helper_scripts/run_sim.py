@@ -112,7 +112,7 @@ def walk_step(queue, mark_last, p1, p2, speed):
     return True
 
 def walk_track_speed(queue, speed):
-    from time import gmtime, strftime
+    from time import localtime, strftime
     
     global curr_lon
     global curr_lat
@@ -122,7 +122,7 @@ def walk_track_speed(queue, speed):
         p2 = queue.get()
         mark_last = queue.mark()
         while True:
-            print("%s (%f, %f) -> (%f, %f)" % (strftime("%H:%M:%S", gmtime()), p1.lat, p1.lon, p2.lat, p2.lon))
+            print("%s (%f, %f) -> (%f, %f)" % (strftime("%H:%M:%S", localtime()), p1.lat, p1.lon, p2.lat, p2.lon))
 
             if not walk_step(queue, mark_last, p1, p2, speed):
                 break

@@ -112,6 +112,8 @@ def walk_step(queue, mark_last, p1, p2, speed):
     return True
 
 def walk_track_speed(queue, speed):
+    from time import gmtime, strftime
+    
     global curr_lon
     global curr_lat
 
@@ -120,20 +122,18 @@ def walk_track_speed(queue, speed):
         p2 = queue.get()
         mark_last = queue.mark()
         while True:
-            print("(%f, %f) -> (%f, %f)" % (p1.lat, p1.lon, p2.lat, p2.lon))
+            print("%s (%f, %f) -> (%f, %f)" % (strftime("%H:%M:%S", gmtime()), p1.lat, p1.lon, p2.lat, p2.lon))
 
             if not walk_step(queue, mark_last, p1, p2, speed):
-                print("reset")
                 break
 
             p1 = p2
             curr_lat = p1.lat
             curr_lon = p1.lon
             if queue.empty() or queue.mark() != mark_last:
-                print("next")
+                print("stop")
                 break
             p2 = queue.get()
-            print("end")
 
 def start_geofix(args):
     s = socket.socket()
@@ -168,7 +168,6 @@ def start_geofix(args):
 
 
 def start_http_server(args, queue):
-    import SimpleHTTPServer
     import SocketServer
     from StringIO import StringIO
 
@@ -227,7 +226,6 @@ def start_http_server(args, queue):
             self.wfile.write("ok")
 
         def get_position(self):
-
             f = StringIO()
             if curr_lat == None or curr_lon == None:
                 f.write("""{

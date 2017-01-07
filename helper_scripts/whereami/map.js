@@ -6,6 +6,7 @@ function init_map() {
     }).addTo(map);
 
     var position = null;
+    var position2 = null;
     var curr_lat = null;
     var curr_lng = null;
 
@@ -18,6 +19,14 @@ function init_map() {
         position = L.circle([lat, lng], 5);
         map.addLayer(position);
         //map.setView([lat, lng]);
+
+        if (position2 != null) {
+            map.removeLayer(position2);
+        }
+        position2 = L.circle([lat, lng], 2500, {
+            fill: false
+        });
+        map.addLayer(position2);
     }
 
     function update() {
@@ -32,7 +41,10 @@ function init_map() {
 
     //-------
     let control = L.Routing.control({
-        fitSelectedRoutes: false
+        fitSelectedRoutes: false,
+        lineOptions : {
+            addWaypoints: false
+        }
     }).addTo(map);
 
     control.on('routesfound', function(e) {

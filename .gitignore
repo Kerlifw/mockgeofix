@@ -7,3 +7,17 @@
 /helper_scripts/runjsonproxy.bat
 /helper_scripts/runsim.bat
 .swp
+/helper_scripts/whereami/leaflet-routing-machine-3.2.4/scripts
+/helper_scripts/whereami/leaflet-routing-machine-3.2.4/src
+/helper_scripts/whereami/leaflet-routing-machine-3.2.4/test
+/helper_scripts/whereami/leaflet-routing-machine-3.2.4/.gitignore
+/helper_scripts/whereami/leaflet-routing-machine-3.2.4/.jshintrc
+/helper_scripts/whereami/leaflet-routing-machine-3.2.4/.npmignore
+/helper_scripts/whereami/leaflet-routing-machine-3.2.4/.travis.yml
+/helper_scripts/whereami/leaflet-routing-machine-3.2.4/bower.json
+/helper_scripts/whereami/leaflet-routing-machine-3.2.4/CHANGELOG.md
+/helper_scripts/whereami/leaflet-routing-machine-3.2.4/Gruntfile.js
+/helper_scripts/whereami/leaflet-routing-machine-3.2.4/package.json
+/helper_scripts/whereami/leaflet-routing-machine-3.2.4/README.md
+/helper_scripts/whereami/leaflet-routing-machine-3.2.4/css
+/helper_scripts/whereami/leaflet-routing-machine-3.2.4/examples

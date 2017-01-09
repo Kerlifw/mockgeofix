@@ -113,6 +113,7 @@ def walk_step(queue, mark_last, p1, p2, speed):
 
 def walk_track_speed(queue, speed):
     from time import localtime, strftime
+    import winsound
     
     global curr_lon
     global curr_lat
@@ -132,6 +133,9 @@ def walk_track_speed(queue, speed):
             curr_lon = p1.lon
             if queue.empty() or queue.mark() != mark_last:
                 print("stop")
+                freq = 1000 # Set Frequency To 2500 Hertz
+                dur = 1000 # Set Duration To 1000 ms == 1 second
+                winsound.Beep(freq, dur)
                 break
             p2 = queue.get()
 

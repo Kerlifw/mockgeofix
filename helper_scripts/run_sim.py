@@ -134,7 +134,7 @@ def walk_track_speed(queue, speed):
             if queue.empty() or queue.mark() != mark_last:
                 print("stop")
                 freq = 1000 # Set Frequency To 2500 Hertz
-                dur = 1000 # Set Duration To 1000 ms == 1 second
+                dur = 200 # Set Duration To 1000 ms == 1 second
                 winsound.Beep(freq, dur)
                 break
             p2 = queue.get()

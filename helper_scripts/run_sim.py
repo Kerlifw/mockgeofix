@@ -25,7 +25,7 @@ import gpxdata
 import Queue
 import uuid
 
-INDEX = "/whereami/whereami.html"
+INDEX = "/whereami/gwhereami.html"
 UPDATE_INTERVAL = 0.3
 
 curr_lat = None  # updated by main thread, read by http and geofix threads

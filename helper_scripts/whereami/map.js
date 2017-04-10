@@ -62,7 +62,7 @@ function init_map() {
 
     let setter = (function *() {
         let waypoints = [];
-        let p = yield
+        let p = yield;
         curr_lat = p.lat;
         curr_lng = p.lng;
         let marker = L.marker([curr_lat, curr_lng]).addTo(map);
@@ -73,7 +73,7 @@ function init_map() {
         while(true) {
             control.spliceWaypoints(0, 2);
             control.setWaypoints(waypoints);
-            p = yield
+            p = yield;
             waypoints = [{lat: curr_lat, lng: curr_lng}]
             waypoints.push(p);
         }

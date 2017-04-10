@@ -41,7 +41,7 @@ function init_map() {
     function update() {
         $.get("/getpos", function(data) {
             if (data.status == "OK") {
-                updateLocation(data.location.lat, data.location.lng)
+                updateLocation(data.location.lat, data.location.lng);
             }
         }, "json");
     }
@@ -56,16 +56,16 @@ function init_map() {
     directionsDisplay.setMap(map);
 
     let setter = (function *() {
-        let p = yield
+        let p = yield;
         let start = new google.maps.LatLng(p.lat(), p.lng());
         curr_lat = start.lat();
         curr_lng = start.lng();
 
-        p = yield
+        p = yield;
         let end = new google.maps.LatLng(p.lat(), p.lng());
         while(true) {
             calculateAndDisplayRoute(directionsService, directionsDisplay, start, end);
-            p = yield
+            p = yield;
             end = new google.maps.LatLng(p.lat(), p.lng());
             start = new google.maps.LatLng(curr_lat, curr_lng); 
         }
